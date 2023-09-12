@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "url-shortener.authenticator" . }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    component: authenticator
+spec:
+  {{- if not .Values.authenticator.autoscaling.enabled }}
+  replicas: {{ .Values.authenticator.replicaCount }}
+  {{- end }}
+  strategy:
+    type: {{ .Values.authenticator.strategy.type }}
+    {{- if (eq "RollingUpdate" .Values.authenticator.strategy.type) }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.authenticator.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.authenticator.strategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "url-shortener.selectorLabels" . | nindent 6 }}
+      component: authenticator
+  template:
+    metadata:
+      {{- with .Values.authenticator.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "url-shortener.selectorLabels" . | nindent 8 }}
+        component: authenticator
+    spec:
+      {{- with .Values.authenticator.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.authenticator.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "url-shortener.authenticator" . }}
+          securityContext:
+            {{- toYaml .Values.authenticator.securityContext | nindent 12 }}
+          image: "{{ .Values.authenticator.image.repository }}:{{ .Values.authenticator.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.authenticator.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.authenticator.containers.authenticator.port }}
+              protocol: TCP
+          env:
+            - name: AUTHENTICATOR_PORT
+              value: {{ .Values.authenticator.containers.authenticator.port | quote }}
+            - name: SQLALCHEMY_DATABASE_URI
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@url-shortener-postgresql.url-shortener.svc.cluster.local:5432/{{ .Values.postgresql.auth.database }}"
+            - name: SQLALCHEMY_TRACK_MODIFICATIONS
+              value: "false"
+            - name: ACCESS_TOKEN_LIFESPAN
+              value: {{ .Values.authenticator.accessToken.lifespan | quote }}
+          {{- if .Values.authenticator.healthCheck.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          {{- end }}
+          resources:
+            {{- toYaml .Values.authenticator.resources | nindent 12 }}
+      {{- with .Values.authenticator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.authenticator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.authenticator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

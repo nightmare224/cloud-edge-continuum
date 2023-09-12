@@ -1,0 +1,80 @@
+---
+- name: Check if docker has installed
+  command: docker -v
+  ignore_errors: true
+  failed_when: false
+  register: docker_has_installed
+
+- name: Install Docker dependencies packages
+  apt:
+    update_cache: yes
+    pkg:
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+  when: docker_has_installed.rc != 0
+
+- name: Add Docker official GPG key (Debian)
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  when:
+    - docker_has_installed.rc != 0
+    - ansible_facts['distribution'] == "Debian"
+  
+- name: Add Docker official GPG key (Ubuntu)
+  shell: |
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  when:
+    - docker_has_installed.rc != 0
+    - ansible_facts['distribution'] == "Ubuntu"
+
+- name: Set up the Docker apt repository (Debian)
+  shell: |
+    echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  when:
+    - docker_has_installed.rc != 0
+    - ansible_facts['distribution'] == "Debian"
+
+- name: Set up the Docker apt repository (Ubuntu)
+  shell: |
+    echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  when:
+    - docker_has_installed.rc != 0
+    - ansible_facts['distribution'] == "Ubuntu"
+
+- name: Install Docker Engine
+  apt:
+    update_cache: yes
+    pkg:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+  when: docker_has_installed.rc != 0
+
+- name: Start Docker
+  service:
+    name: docker
+    state: started
+  when: docker_has_installed.rc != 0
+
+- name: Add current Ansible user to Docker group
+  user:
+    name: "{{ ansible_user }}"
+    group: docker
+  when: docker_has_installed.rc != 0
+  
+- name: reset ssh connection to allow user changes to affect ansible user
+  meta: reset_connection
+  when: docker_has_installed.rc != 0
+
+- name: Set Cgroup driver to systemd and enable quay.io registry (or it will get x509 error )
+  lineinfile:
+    path: /etc/docker/daemon.json
+    line: '{"exec-opts": ["native.cgroupdriver=systemd"],"insecure-registries": ["quay.io"]}'
+    create: yes
+  when: docker_has_installed.rc != 0

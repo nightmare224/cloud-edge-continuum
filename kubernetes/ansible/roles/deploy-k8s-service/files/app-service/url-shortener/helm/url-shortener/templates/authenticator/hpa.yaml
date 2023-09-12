@@ -1,0 +1,29 @@
+{{- if .Values.authenticator.autoscaling.enabled }}
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "url-shortener.authenticator" . }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    component: ui
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "url-shortener.authenticator" . }}
+  minReplicas: {{ .Values.authenticator.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.aauthenticator.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.authenticator.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: {{ .Values.authenticator.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.authenticator.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        targetAverageUtilization: {{ .Values.authenticator.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}

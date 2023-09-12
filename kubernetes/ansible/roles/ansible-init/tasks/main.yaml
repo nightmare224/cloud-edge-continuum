@@ -1,0 +1,26 @@
+- name: Generate SSH fingerprints
+  command: /usr/bin/ssh-keyscan {{ ansible_host }}
+  register: keyscan
+
+- name: Add SSH fingerprints to known_hosts
+  connection: local
+  lineinfile:
+    path: ~/.ssh/known_hosts
+    create: yes
+    line: "{{ item }}"
+  with_items: "{{ keyscan.stdout_lines }}"
+
+- name: Configure visudo
+  ansible.builtin.shell: |
+    sudoer='{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL'
+    echo {{ ansible_password }} | sudo -S EDITOR='cat' visudo | grep "${sudoer}" > /dev/null 2>&1
+    ret_val=$?
+    if [ ${ret_val} -ne 0 ]; then
+        echo "Enable NOPASSWD for user({{ ansible_user }})"
+        echo {{ ansible_password }} | sudo -S echo "${sudoer}" | sudo EDITOR='tee -a' visudo &> /dev/null
+        ret_val=$?
+        if [ ${ret_val} -ne 0 ]; then
+          echo "Enable failed"
+          exit ${ret_val}
+        fi
+    fi

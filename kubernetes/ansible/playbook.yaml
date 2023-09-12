@@ -1,0 +1,59 @@
+---
+- name: Configuration for ansible connection
+  hosts: all
+  roles:
+    - { role: ansible-init }
+  tags: ansible-init
+
+- name: Install Helm
+  hosts: master
+  roles:
+    - { role: helm, become: yes }
+  tags: k8s
+
+
+- name: Install k8s
+  hosts: all
+  roles:
+    - { role: docker, become: yes }
+    - { role: k8s-install, become: yes }
+  tags: k8s
+
+
+- name: Init k8s master
+  hosts: master
+  roles:
+    - { role: k8s-master-init, become: yes }
+  tags: k8s
+
+- name: Init k8s worker
+  hosts: worker
+  roles:
+    - { role: k8s-worker-init, become: yes }
+  tags: k8s
+
+- name: Install cluster monitor-service
+  hosts: master
+  roles:
+    - { role: deploy-k8s-service, service_name: k9s, service_type: monitor-service, become: yes }
+  tags: monitor-service
+
+# - name: Install service requirement
+#   hosts: all
+#   roles:
+#     - { role: service-requirement, become: yes }
+#   tags: infra-service
+
+- name: Deploy infra service
+  hosts: master
+  roles:
+    - { role: deploy-k8s-service, service_name: calico, service_type: infra-service }
+    # - { role: deploy-k8s-service, service_name: ingress-nginx, service_type: infra-service }
+    # - { role: deploy-k8s-service, service_name: longhorn, service_type: infra-service }
+  tags: infra-service
+
+# - name: Deploy app service
+#   hosts: master
+#   roles:
+#     - { role: deploy-k8s-service, service_name: url-shortener, service_type: app-service }
+#   tags: app-service

@@ -1,0 +1,35 @@
+---
+- name: Install dependencies packages
+  apt:
+    update_cache: yes
+    pkg:
+    - rsync
+  become: yes
+
+- name: Create dependencies directory
+  file:
+    path: /home/{{ ansible_user }}/k8s/{{ item }}
+    state: directory
+  loop:
+    - deployment
+  become_user: "{{ ansible_user }}"
+
+# Before Deploy, Need to Transfer deploy file to Master Node
+- name: Transfer {{ service_name }} to master
+  synchronize:
+    src: "{{ service_type }}/{{ service_name }}"
+    dest: /home/{{ ansible_user }}/k8s/deployment
+
+- name: Change file permissions
+  file: 
+    path: /home/{{ ansible_user }}/k8s/deployment/{{ service_name }}/{{ item }}
+    mode: '0755'
+  loop:
+    - deploy.sh
+    - uninstall.sh
+  become: yes
+
+- name: Deploy and wait until running
+  shell: /home/{{ ansible_user }}/k8s/deployment/{{ service_name }}/deploy.sh
+  args:
+    executable: /bin/bash

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "url-shortener.authenticator" . }}
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+    component: authenticator
+spec:
+  type: {{ .Values.authenticator.service.type }}
+  ports:
+    - port: {{ .Values.authenticator.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "url-shortener.selectorLabels" . | nindent 4 }}
+    component: authenticator

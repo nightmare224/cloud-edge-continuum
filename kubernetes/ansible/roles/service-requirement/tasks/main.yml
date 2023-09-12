@@ -1,0 +1,6 @@
+---
+- name: Install Longhorn dependencies packages
+  apt:
+    pkg: 
+    - open-iscsi
+    - nfs-common

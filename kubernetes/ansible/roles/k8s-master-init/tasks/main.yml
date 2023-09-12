@@ -1,0 +1,38 @@
+---
+- name: Check Kubelet Status
+  command: systemctl is-active kubelet
+  ignore_errors: true
+  failed_when: false
+  register: kubelet_is_active
+
+# Can see all parameter here: https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/
+- name: Initialize the Kubernetes cluster using kubeadm
+  command: |
+    kubeadm init \
+      --apiserver-advertise-address="{{ node_ip }}" \
+      --apiserver-cert-extra-sans="{{ node_ip }}" \
+      --pod-network-cidr=172.16.0.0/20
+  vars:
+    node_ip: "{{ hostvars[inventory_hostname]['ansible_env'].SSH_CONNECTION.split(' ')[2] }}"
+  when: kubelet_is_active.rc != 0
+
+- name: Set up kubeconfig for the current Ansible user
+  shell: |
+    mkdir -p ${HOME}/.kube
+    sudo cp /etc/kubernetes/admin.conf ${HOME}/.kube/config
+    sudo chown $(id -u):$(id -g) ${HOME}/.kube/config
+  become_user: "{{ ansible_user }}"
+  when: kubelet_is_active.rc != 0
+
+- name: Generate join command script to localhost
+  shell: sudo kubeadm token create --print-join-command
+  register: join_command
+  when: kubelet_is_active.rc != 0
+
+- name: Copy join command to local files
+  copy:
+    dest: "{{ playbook_dir }}/roles/k8s-worker-init/files/join-command"
+    content: "{{ join_command.stdout_lines[0] }}"
+  delegate_to: localhost
+  become_user: "{{ lookup('env', 'USER') }}"
+  when: kubelet_is_active.rc != 0

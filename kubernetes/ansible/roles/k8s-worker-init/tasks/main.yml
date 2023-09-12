@@ -1,0 +1,17 @@
+---
+- name: Check Kubelet Status
+  command: systemctl is-active kubelet
+  ignore_errors: true
+  failed_when: false
+  register: kubelet_is_active
+
+- name: Copy the join command file to nodes
+  copy: 
+    src: "{{ role_path }}/files/join-command" 
+    dest: /tmp/join-command.sh 
+    mode: 0744
+  when: kubelet_is_active.rc != 0
+
+- name: Join the work node to Kubernetes cluster
+  shell: /tmp/join-command.sh
+  when: kubelet_is_active.rc != 0

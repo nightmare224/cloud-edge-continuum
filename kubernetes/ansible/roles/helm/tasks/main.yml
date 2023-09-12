@@ -1,0 +1,38 @@
+---
+- name: Check if helm has installed
+  command: helm version
+  ignore_errors: true
+  failed_when: false
+  register: helm_has_installed
+
+- name: Install Helm dependencies packages
+  apt:
+    pkg: 
+    - apt-transport-https
+    - curl
+  when: helm_has_installed.rc != 0
+
+# - name: Add Helm official GPG key
+#   shell: |
+#     curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+#   when: helm_has_installed.rc != 0
+
+# - name: Install Helm
+#   apt:
+#     update_cache: yes
+#     pkg:
+#     - helm
+#     allow_unauthenticated: yes
+#   when: helm_has_installed.rc != 0
+- name: Download helm script
+  shell: |
+    curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    chmod 700 /tmp/get_helm.sh
+  when: helm_has_installed.rc != 0
+
+- name: Install Helm
+  shell: /tmp/get_helm.sh
+  args:
+    executable: /bin/bash
+  when: helm_has_installed.rc != 0

@@ -1,0 +1,90 @@
+---
+- name: Check if kubeadm install or not
+  command: kubeadm version
+  ignore_errors: true
+  failed_when: false
+  register: kubeadm_has_installed
+
+- name: Upgrade containerd
+  shell: |
+    systemctl stop containerd
+    sudo apt-get remove containerd
+    sudo apt-get update && sudo apt-get -y install containerd.io
+    sudo rm /etc/containerd/config.toml
+    containerd config default | sed 's/SystemdCgroup = false/SystemdCgroup = true/' | sudo tee /etc/containerd/config.toml
+    sudo systemctl start containerd
+  when: kubeadm_has_installed.rc != 0
+
+- name: Install Kubernetes dependencies packages
+  apt:
+    pkg: 
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - net-tools
+  when: kubeadm_has_installed.rc != 0
+
+- name: Add Kubernetes official GPG key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+  when: kubeadm_has_installed.rc != 0
+
+- name: Set up the Kubernetes apt respository
+  apt_repository:
+    repo: deb http://packages.cloud.google.com/apt/ kubernetes-xenial main
+    state: present
+    filename: kubernetes
+  when: kubeadm_has_installed.rc != 0
+
+# Kubelet will not start if the system has swap enabled
+- name: Remove swapfile from /etc/fstab
+  mount:
+    name: "{{ item }}"
+    fstype: swap
+    state: absent
+  with_items:
+    - swap
+    - none
+  # when: kubeadm_has_installed.rc != 0
+
+- name: Add cgroup flags
+  shell: echo " cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1" | sudo tee -a  /boot/cmdline.txt
+  when: kubeadm_has_installed.rc != 0
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: Configure node ip and hostname
+  lineinfile:
+    path: /etc/default/kubelet
+    line: KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }} --container-runtime-endpoint=unix:///run/containerd/containerd.sock
+    create: yes
+  vars:
+    node_ip: "{{ hostvars[inventory_hostname]['ansible_env'].SSH_CONNECTION.split(' ')[2] }}"
+  when: kubeadm_has_installed.rc != 0
+
+- name: Install Kubernets binaries
+  apt:
+    update_cache: yes
+    pkg:
+    - kubelet=1.26.0-00
+    - kubeadm=1.26.0-00
+    - kubectl=1.26.1-00
+    allow_downgrade: yes
+  when: kubeadm_has_installed.rc != 0
+
+- name: Restart docker
+  service:
+    name: docker
+    daemon_reload: yes
+    state: restarted
+  when: kubeadm_has_installed.rc != 0
+
+- name: Restart kubelet
+  service:
+    name: kubelet
+    daemon_reload: yes
+    state: restarted
+  when: kubeadm_has_installed.rc != 0

@@ -1,0 +1,135 @@
+# Default values for url-shortener.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+fullnameOverride: ""
+nameOverride: ""
+
+api:
+  replicaCount: 3
+
+  image:
+    repository: nightmare224/url-shortener-api
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "latest"
+
+  imagePullSecrets: []
+
+  containers:
+    api:
+      port: 5001
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources: {}
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 50%
+      maxSurge: 100%
+
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  healthCheck:
+    enabled: false
+
+
+authenticator:
+  replicaCount: 3
+
+  image:
+    repository: nightmare224/url-shortener-authenticator
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: "latest"
+
+  imagePullSecrets: []
+
+  containers:
+    authenticator:
+      port: 5002
+
+  service:
+    type: ClusterIP
+    port: 80
+    sessionAffinity: ClientIP
+
+  resources: {}
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 50%
+      maxSurge: 100%
+
+  autoscaling:
+    enabled: false
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  healthCheck:
+    enabled: false
+
+  podAnnotations: {}
+
+  podSecurityContext: {}
+
+  securityContext: {}
+
+  accessToken:
+    lifespan: 3600
+
+
+postgresql:
+  enabled: true
+  auth:
+    username: postgresadmin
+    password: "admin123"
+    database: url_shortener
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+  host: snv.io
+  paths:
+    - path: /
+      pathType: Prefix
+      serviceName: us-api
+      servicePort: 80
+    - path: /users
+      pathType: Prefix
+      serviceName: us-authenticator
+      servicePort: 80
+    - path: /auth
+      pathType: Prefix
+      serviceName: us-authenticator
+      servicePort: 80

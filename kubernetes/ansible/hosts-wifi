@@ -1,0 +1,5 @@
+[master]
+k8s-master1 ansible_host=192.168.1.192 ansible_user=thl ansible_password=efreet224
+
+[worker]
+k8s-worker1 ansible_host=192.168.1.129 ansible_user=pi ansible_password=p@ssword
